@@ -1,0 +1,8 @@
+{
+  "name": "Ghost-Watch C2 Terminal",
+  "description": "Ghost-Watch C2 Terminal (Apex Tier) - An advanced, high-density, PQC-hardened command and control toolkit for elite operators.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

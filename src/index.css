@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Helvetica Neue", Arial, sans-serif, "Inter", ui-sans-serif, system-ui;
+  --font-mono: "Courier New", Courier, monospace, "JetBrains Mono", ui-monospace;
+
+  --color-ghost-green: #00FF41;
+  --color-ghost-dark: #0D0D0D;
+  --color-ghost-border: #333333;
+  --color-ghost-surface: #1A1A1A;
+  --color-ghost-warning: #FFB000;
+  --color-ghost-danger: #FF4444;
+  --color-text-dim: #888888;
+}
+
+@layer base {
+  body {
+    @apply bg-ghost-dark text-[#E0E0E0] font-sans antialiased overflow-hidden;
+  }
+
+  ::-webkit-scrollbar {
+    width: 2px;
+    height: 2px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-ghost-dark;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-ghost-border rounded-none hover:bg-ghost-green/50;
+  }
+}
+
+.scanline {
+  width: 100%;
+  height: 100px;
+  z-index: 10;
+  background: linear-gradient(0deg, rgba(0, 0, 0, 0) 0%, rgba(0, 255, 65, 0.05) 50%, rgba(0, 0, 0, 0) 100%);
+  opacity: 0.1;
+  position: absolute;
+  bottom: 100%;
+  animation: scanline 10s linear infinite;
+}
+
+@keyframes scanline {
+  0% { bottom: 100%; }
+  80% { bottom: 100%; }
+  100% { bottom: -100px; }
+}
+
+.glow-text {
+  text-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
+}
+
+.high-density-panel {
+  @apply bg-ghost-dark p-[15px] flex flex-col gap-[15px];
+}
+
+.panel-header-line {
+  @apply text-[10px] uppercase tracking-[1px] text-text-dim mb-[10px] flex justify-between border-b border-ghost-border pb-[5px] font-mono;
+}
+
+.terminal-area-theme {
+  @apply bg-[#050505] p-[15px] font-mono text-[12px] border border-[#222] overflow-hidden;
+}

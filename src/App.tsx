@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Shield, 
   Satellite, 
@@ -81,9 +81,9 @@ export default function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  const addLog = (msg: string, type: 'info' | 'warn' | 'error' | 'success' = 'info') => {
-    setLogs(prev => [{ id: Math.random().toString(36), msg, type }, ...prev].slice(0, 100));
-  };
+  const addLog = useCallback((msg: string, type: 'info' | 'warn' | 'error' | 'success' = 'info') => {
+    setLogs(prev => [{ id: Math.random().toString(36).substring(2, 9), msg, type }, ...prev].slice(0, 100));
+  }, []);
 
   const navItems = [
     { id: 'overview' as const, label: 'Systems Brief', icon: Activity },
@@ -366,7 +366,7 @@ export default function App() {
               </div>
            </div>
            
-           <div className="flex-1 overflow-y-auto p-4 sm:p-6 scroll-smooth custom-scrollbar">
+           <div className="flex-1 overflow-y-auto p-4 sm:p-6 custom-scrollbar">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={activeModule}

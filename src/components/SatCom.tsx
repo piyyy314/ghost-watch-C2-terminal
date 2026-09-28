@@ -44,7 +44,11 @@ export default function SatCom({ addLog }: SatComProps) {
 
   useEffect(() => {
     if (terminalContainerRef.current) {
-      terminalContainerRef.current.scrollTop = terminalContainerRef.current.scrollHeight;
+      const el = terminalContainerRef.current;
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 50;
+      if (isNearBottom) {
+        el.scrollTop = el.scrollHeight;
+      }
     }
   }, [signalLogs]);
 

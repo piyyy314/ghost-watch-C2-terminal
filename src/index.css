@@ -15,6 +15,14 @@
 }
 
 @layer base {
+  * {
+    overflow-anchor: none;
+  }
+
+  html, body {
+    scroll-behavior: auto !important;
+  }
+
   body {
     @apply bg-ghost-dark text-[#E0E0E0] font-sans antialiased overflow-hidden;
   }

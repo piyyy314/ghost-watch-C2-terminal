@@ -84,15 +84,18 @@ export default function Geolocation({ addLog, customTraces, setCustomTraces }: G
   const [typeFilter, setTypeFilter] = useState<Intercept['type'] | 'ALL'>('ALL');
   const [statusFilter, setStatusFilter] = useState<Intercept['status'] | 'ALL'>('ALL');
 
+  const breachedFencesRef = React.useRef<Set<string>>(new Set());
+
   useEffect(() => {
     if (!tracingId) return;
+    breachedFencesRef.current.clear();
 
     // Movement interval - simulates target trying to move/evade erratically
     const moveInterval = setInterval(() => {
-      const logsToTrigger: { msg: string; type: 'info' | 'warn' | 'error' | 'success' }[] = [];
+      let pendingLog: { msg: string; type: 'info' | 'warn' | 'error' | 'success' } | null = null;
 
       setIntercepts(prev => {
-        const nextState = prev.map(int => {
+        return prev.map(int => {
           if (int.id === tracingId && int.status !== 'TRACED') {
             // Standard jitter
             const jitterX = (Math.random() - 0.5) * 1.2;
@@ -107,15 +110,16 @@ export default function Geolocation({ addLog, customTraces, setCustomTraces }: G
 
             // Geo-fence check
             geofences.forEach(fence => {
-              const wasInside = int.coordinates[0] >= fence.minLat && int.coordinates[0] <= fence.maxLat &&
-                                int.coordinates[1] >= fence.minLon && int.coordinates[1] <= fence.maxLon;
+              const fenceKey = `${int.id}-${fence.id}`;
               const isInside = newLat >= fence.minLat && newLat <= fence.maxLat &&
                                newLon >= fence.minLon && newLon <= fence.maxLon;
 
-              if (isInside && !wasInside) {
-                logsToTrigger.push({ msg: `TARGET ${int.id} ENTERED SECURE BOUNDARY ${fence.id}`, type: 'error' });
-              } else if (!isInside && wasInside) {
-                logsToTrigger.push({ msg: `TARGET ${int.id} BREACHED PERIMETER ${fence.id}`, type: 'error' });
+              if (isInside && !breachedFencesRef.current.has(fenceKey)) {
+                breachedFencesRef.current.add(fenceKey);
+                pendingLog = { msg: `TARGET ${int.id} ENTERED SECURE BOUNDARY ${fence.id}`, type: 'error' };
+              } else if (!isInside && breachedFencesRef.current.has(fenceKey)) {
+                breachedFencesRef.current.delete(fenceKey);
+                pendingLog = { msg: `TARGET ${int.id} BREACHED/EXITED PERIMETER ${fence.id}`, type: 'warn' };
               }
             });
 
@@ -126,13 +130,10 @@ export default function Geolocation({ addLog, customTraces, setCustomTraces }: G
           }
           return int;
         });
-        return nextState;
       });
 
-      if (logsToTrigger.length > 0) {
-        setTimeout(() => {
-          logsToTrigger.forEach(l => addLog(l.msg, l.type));
-        }, 0);
+      if (pendingLog) {
+        addLog((pendingLog as any).msg, (pendingLog as any).type);
       }
     }, 250); // Faster interval for erratic movement
 
@@ -148,7 +149,7 @@ export default function Geolocation({ addLog, customTraces, setCustomTraces }: G
       clearInterval(moveInterval);
       clearTimeout(finishTimeout);
     };
-  }, [tracingId, addLog, geofences]);
+  }, [tracingId, addLog, geofences, setCustomTraces]);
 
   const initiateTrace = (id: string) => {
     setPendingConfirmId(id);

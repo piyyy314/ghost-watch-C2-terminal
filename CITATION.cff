@@ -1,0 +1,16 @@
+cff-version: 1.2.0
+message: "If you use Ghost-Watch C2 Terminal in your research or operations, please cite it as below."
+title: "Ghost-Watch C2 Terminal: Real-Time Command & Control Workstation with Post-Quantum Cryptography"
+version: 2.1.0
+date-released: 2026-10-28
+url: "https://github.com/ghost-watch/ghost-watch-c2"
+license: Apache-2.0
+keywords:
+  - "command-and-control"
+  - "c2-terminal"
+  - "post-quantum-cryptography"
+  - "recharts"
+  - "real-time-telemetry"
+  - "server-sent-events"
+  - "kyber-1024"
+  - "dilithium-3"

@@ -18,7 +18,8 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ModuleId, INITIAL_STATUS, SystemStatus, CustomTraceConfig } from './types';
+import { ModuleId, INITIAL_STATUS, SystemStatus, CustomTraceConfig, SystemHealthData } from './types';
+
 
 // Module Components
 import Overview from './components/Overview';
@@ -76,10 +77,35 @@ export default function App() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  const [systemHealth, setSystemHealth] = useState<SystemHealthData | null>(null);
+
+  // Poll system health for live global environment status
+  useEffect(() => {
+    let isMounted = true;
+    const fetchHealth = async () => {
+      try {
+        const res = await fetch('/api/system/health');
+        if (res.ok && isMounted) {
+          const data: SystemHealthData = await res.json();
+          setSystemHealth(data);
+        }
+      } catch (err) {
+        // silent fail
+      }
+    };
+    fetchHealth();
+    const interval = setInterval(fetchHealth, 3000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
   useEffect(() => {
     const timer = setTimeout(() => setBootSequence(false), 2000);
     return () => clearTimeout(timer);
   }, []);
+
 
   const addLog = useCallback((msg: string, type: 'info' | 'warn' | 'error' | 'success' = 'info') => {
     setLogs(prev => [{ id: Math.random().toString(36).substring(2, 9), msg, type }, ...prev].slice(0, 100));
@@ -246,14 +272,16 @@ export default function App() {
            </div>
         </div>
 
-        <div className="panel-header-line mt-4">
-          <span>C2 Environment</span>
+        <div className="panel-header-line mt-4 flex items-center justify-between">
+          <span>Live C2 Environment</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-ghost-green animate-ping" />
         </div>
         <div className="text-[11px] text-text-dim font-mono space-y-1">
-          <p>Uptime: 412:12:05</p>
-          <p>Memory: 1.4GB / 32GB</p>
-          <p>Network: 915.0 MHz (LoRa)</p>
-          <p>Gateway: 127.0.0.1:8080</p>
+          <p>Uptime: <span className="text-white font-semibold">{systemHealth?.system.uptimeFormatted || '00:00:00'}</span></p>
+          <p>Memory: <span className="text-white font-semibold">{systemHealth ? `${systemHealth.memory.usedGB}GB / ${systemHealth.memory.totalGB}GB (${systemHealth.memory.usagePercent}%)` : 'Scanning...'}</span></p>
+          <p>CPU Load: <span className="text-ghost-green font-semibold">{systemHealth ? `${systemHealth.cpu.usagePercent}% (${systemHealth.cpu.coreCount} Cores)` : 'Calculating...'}</span></p>
+          <p>Disk Mount: <span className="text-ghost-warning font-semibold">{systemHealth ? `${systemHealth.disk.usedGB}GB / ${systemHealth.disk.totalGB}GB` : '/'}</span></p>
+          <p>Host: <span className="text-zinc-400">{systemHealth ? `${systemHealth.system.hostname} [${systemHealth.system.arch}]` : 'Apex-Node'}</span></p>
         </div>
 
         <div className="flex-1" />

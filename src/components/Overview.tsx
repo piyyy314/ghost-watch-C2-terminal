@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SystemStatus, CustomTraceConfig } from '../types';
+import SystemHealthWidget from './SystemHealthWidget';
+
 
 interface OverviewProps {
   status: SystemStatus;
@@ -248,6 +250,9 @@ END OF REPORT // GHOST-WATCH LE-01 OPERATIONAL SOVEREIGNTY SECURED
           </motion.div>
         ))}
       </div>
+      
+      {/* Real-Time Live System Health Telemetry Widget */}
+      <SystemHealthWidget onHealthAlert={addLog} />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         

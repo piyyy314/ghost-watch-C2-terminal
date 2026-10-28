@@ -26,3 +26,55 @@ export const INITIAL_STATUS: SystemStatus = {
   pqcStatus: 'PQC-Hardened',
 };
 
+export interface CpuCoreMetric {
+  core: number;
+  model: string;
+  speed: number;
+  usagePercent: number;
+}
+
+export interface SystemHealthData {
+  timestamp: number;
+  timeString: string;
+  cpu: {
+    usagePercent: number;
+    cores: CpuCoreMetric[];
+    loadAvg: [number, number, number];
+    model: string;
+    coreCount: number;
+  };
+  memory: {
+    totalBytes: number;
+    usedBytes: number;
+    freeBytes: number;
+    usagePercent: number;
+    totalGB: number;
+    usedGB: number;
+    freeGB: number;
+    processRssMB: number;
+    heapUsedMB: number;
+    heapTotalMB: number;
+  };
+  disk: {
+    totalBytes: number;
+    usedBytes: number;
+    freeBytes: number;
+    usagePercent: number;
+    totalGB: number;
+    usedGB: number;
+    freeGB: number;
+    mountPoint: string;
+  };
+  system: {
+    platform: string;
+    arch: string;
+    release: string;
+    hostname: string;
+    uptimeSeconds: number;
+    uptimeFormatted: string;
+    nodeVersion: string;
+    pid: number;
+  };
+}
+
+

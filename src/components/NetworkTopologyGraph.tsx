@@ -3,25 +3,25 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import * as d3 from 'd3';
 import { 
   Network, 
-  ShieldAlert, 
   Activity, 
   Radio, 
   Zap, 
-  Terminal, 
   RotateCcw, 
   Play, 
   Pause, 
   Wifi, 
   WifiOff, 
   Cpu, 
-  Send,
-  Eye,
-  Sliders,
-  Sparkles
+  Sparkles,
+  Maximize2,
+  Filter,
+  ShieldAlert,
+  Layers,
+  Crosshair
 } from 'lucide-react';
 
 export interface NetworkNode extends d3.SimulationNodeDatum {
@@ -209,7 +209,7 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
   const containerRef = useRef<HTMLDivElement | null>(null);
 
   const [nodes, setNodes] = useState<NetworkNode[]>(() => JSON.parse(JSON.stringify(INITIAL_NODES)));
-  const [links, setLinks] = useState<NetworkLink[]>(() => JSON.parse(JSON.stringify(INITIAL_LINKS)));
+  const [links] = useState<NetworkLink[]>(() => JSON.parse(JSON.stringify(INITIAL_LINKS)));
   const [selectedNodeId, setSelectedNodeId] = useState<string>('c2-apex');
   const [simulationRunning, setSimulationRunning] = useState<boolean>(true);
   const [flowRate, setFlowRate] = useState<'normal' | 'burst' | 'stealth'>('normal');
@@ -218,9 +218,17 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
   const [livePacketsTransferred, setLivePacketsTransferred] = useState<number>(1420);
 
   const simulationRef = useRef<d3.Simulation<NetworkNode, NetworkLink> | null>(null);
+  const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+  const gRef = useRef<d3.Selection<SVGGElement, unknown, null, undefined> | null>(null);
   const packetsRef = useRef<Packet[]>([]);
   const packetIdGenRef = useRef<number>(1);
   const animFrameRef = useRef<number | null>(null);
+  const nodesStateRef = useRef<NetworkNode[]>(nodes);
+
+  // Keep nodesStateRef in sync with nodes for animation loop
+  useEffect(() => {
+    nodesStateRef.current = nodes;
+  }, [nodes]);
 
   const selectedNode = useMemo(() => {
     return nodes.find(n => n.id === selectedNodeId) || nodes[0];
@@ -276,23 +284,25 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
 
     // Root group for pan/zoom
     const g = svg.append('g').attr('class', 'network-root');
+    gRef.current = g;
 
     // Zoom behavior
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.4, 3])
+      .scaleExtent([0.35, 3.5])
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
       });
 
+    zoomBehaviorRef.current = zoom;
     svg.call(zoom);
 
-    // Initial positioning: C2 in center, others in balanced ring
+    // Initial simulation data
     const simNodes = nodes.map(n => ({ ...n }));
     const simLinks = links.map(l => ({ ...l }));
 
     const sim = d3.forceSimulation<NetworkNode, NetworkLink>(simNodes)
       .force('link', d3.forceLink<NetworkNode, NetworkLink>(simLinks).id(d => d.id).distance(140).strength(0.7))
-      .force('charge', d3.forceManyBody().strength(-450))
+      .force('charge', d3.forceManyBody().strength(-480))
       .force('center', d3.forceCenter(width / 2, height / 2))
       .force('collide', d3.forceCollide().radius(45).iterations(2));
 
@@ -306,7 +316,7 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
     }
 
     // Draw background grid lines inside zoom group
-    const grid = g.append('g').attr('class', 'grid-layer').attr('opacity', 0.15);
+    const grid = g.append('g').attr('class', 'grid-layer').attr('opacity', 0.12);
     for (let x = -width; x < width * 2; x += 60) {
       grid.append('line').attr('x1', x).attr('y1', -height).attr('x2', x).attr('y2', height * 2).attr('stroke', '#00ff41').attr('stroke-width', 0.5);
     }
@@ -316,11 +326,11 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
 
     // Links container
     const linkGroup = g.append('g').attr('class', 'links-layer');
-    // Link elements
-    const linkLines = linkGroup.selectAll<SVGLineElement, NetworkLink>('line')
+    const linkLines = linkGroup.selectAll<SVGLineElement, NetworkLink>('.link-line')
       .data(simLinks)
       .enter()
       .append('line')
+      .attr('class', 'link-line')
       .attr('stroke', d => {
         if (d.protocol === 'PQC/KYBER') return '#00ff41';
         if (d.protocol === 'SIGINT-ECHO') return '#06b6d4';
@@ -331,7 +341,7 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
       .attr('stroke-opacity', 0.45)
       .attr('stroke-dasharray', d => d.quality < 90 ? '4 3' : 'none');
 
-    // Link label or ping text
+    // Link label
     const linkLabels = linkGroup.selectAll<SVGTextElement, NetworkLink>('.link-label')
       .data(simLinks)
       .enter()
@@ -362,7 +372,6 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
       })
       .on('end', (event, d) => {
         if (!event.active && simulationRef.current) simulationRef.current.alphaTarget(0);
-        // Only keep C2 apex fixed, release other nodes to settle
         if (d.id !== 'c2-apex') {
           d.fx = null;
           d.fy = null;
@@ -401,19 +410,22 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
       .attr('dur', '14s')
       .attr('repeatCount', 'indefinite');
 
-    // Node outer boundary (hex/circle)
+    // Node outer boundary (circle)
     nodeItems.append('circle')
+      .attr('class', 'node-outer-circle')
       .attr('r', d => d.role === 'c2' ? 24 : d.role === 'gateway' ? 18 : 15)
       .attr('fill', d => {
         if (d.id === selectedNodeId) return '#052e16';
         if (d.status === 'degraded') return '#2a1a05';
         if (d.status === 'syncing') return '#042f2e';
+        if (d.status === 'isolated') return '#260606';
         return '#020617';
       })
       .attr('stroke', d => {
         if (d.id === selectedNodeId) return '#00ff41';
         if (d.status === 'degraded') return '#eab308';
         if (d.status === 'syncing') return '#06b6d4';
+        if (d.status === 'isolated') return '#ef4444';
         if (d.role === 'c2') return '#00ff41';
         if (d.role === 'firewall') return '#ef4444';
         return '#22c55e';
@@ -423,8 +435,10 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
 
     // Node inner icon/dot
     nodeItems.append('circle')
+      .attr('class', 'node-inner-dot')
       .attr('r', d => d.role === 'c2' ? 6 : 4)
       .attr('fill', d => {
+        if (d.status === 'isolated') return '#ef4444';
         if (d.status === 'degraded') return '#eab308';
         if (d.status === 'syncing') return '#06b6d4';
         if (d.role === 'firewall') return '#ef4444';
@@ -433,6 +447,7 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
 
     // Node Label
     nodeItems.append('text')
+      .attr('class', 'node-title-text')
       .attr('y', d => d.role === 'c2' ? 36 : 28)
       .attr('text-anchor', 'middle')
       .attr('font-size', '9px')
@@ -444,6 +459,7 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
 
     // Node IP subtitle
     nodeItems.append('text')
+      .attr('class', 'node-ip-text')
       .attr('y', d => d.role === 'c2' ? 46 : 37)
       .attr('text-anchor', 'middle')
       .attr('font-size', '7.5px')
@@ -489,12 +505,24 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
     // Continuous packet flow animation loop
     const animatePackets = () => {
       const speedMultiplier = flowRate === 'burst' ? 2.2 : flowRate === 'stealth' ? 0.5 : 1.0;
+      const currentLiveNodes = nodesStateRef.current;
       
       // Update packet positions
       const updatedPackets = packetsRef.current.map(pkt => {
+        const sNode = currentLiveNodes.find(n => n.id === pkt.sourceId);
+        const tNode = currentLiveNodes.find(n => n.id === pkt.targetId);
+
+        // If either endpoint is isolated, freeze packet movement
+        if (sNode?.status === 'isolated' || tNode?.status === 'isolated') {
+          return {
+            ...pkt,
+            type: 'alert' as const,
+            progress: 0.5
+          };
+        }
+
         let nextProg = pkt.progress + pkt.speed * speedMultiplier;
         if (nextProg >= 1) {
-          // Packet reached destination, reverse direction or recycle
           nextProg = 0;
           setLivePacketsTransferred(c => c + 1);
         }
@@ -542,11 +570,113 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
 
     animFrameRef.current = requestAnimationFrame(animatePackets);
 
+    // Responsive container resize observer
+    const resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width: newW, height: newH } = entry.contentRect;
+        if (newW > 0 && newH > 0 && simulationRef.current) {
+          simulationRef.current.force('center', d3.forceCenter(newW / 2, newH / 2));
+          const apex = simNodes.find(n => n.id === 'c2-apex');
+          if (apex) {
+            apex.fx = newW / 2;
+            apex.fy = newH / 2;
+          }
+          simulationRef.current.alpha(0.15).restart();
+        }
+      }
+    });
+
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
+
     return () => {
+      resizeObserver.disconnect();
       if (simulationRef.current) simulationRef.current.stop();
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
   }, [flowRate, packetBurstCount]);
+
+  // Reactive node styling sync: updates SVG visuals when selectedNodeId, nodes, or filterRole changes
+  useEffect(() => {
+    if (!svgRef.current) return;
+    const svg = d3.select(svgRef.current);
+
+    // Update node outer circles
+    svg.selectAll<SVGCircleElement, NetworkNode>('.node-outer-circle')
+      .transition()
+      .duration(200)
+      .attr('fill', d => {
+        const live = nodes.find(n => n.id === d.id) || d;
+        if (d.id === selectedNodeId) return '#052e16';
+        if (live.status === 'isolated') return '#260606';
+        if (live.status === 'degraded') return '#2a1a05';
+        if (live.status === 'syncing') return '#042f2e';
+        return '#020617';
+      })
+      .attr('stroke', d => {
+        const live = nodes.find(n => n.id === d.id) || d;
+        if (d.id === selectedNodeId) return '#00ff41';
+        if (live.status === 'isolated') return '#ef4444';
+        if (live.status === 'degraded') return '#eab308';
+        if (live.status === 'syncing') return '#06b6d4';
+        if (d.role === 'c2') return '#00ff41';
+        if (d.role === 'firewall') return '#ef4444';
+        return '#22c55e';
+      })
+      .attr('stroke-width', d => d.id === selectedNodeId ? 2.5 : 1.5)
+      .attr('filter', d => d.id === selectedNodeId ? 'url(#neon-glow)' : 'none')
+      .attr('opacity', d => {
+        if (filterRole === 'all') return 1;
+        return d.role === filterRole ? 1 : 0.35;
+      });
+
+    // Update node inner dots
+    svg.selectAll<SVGCircleElement, NetworkNode>('.node-inner-dot')
+      .transition()
+      .duration(200)
+      .attr('fill', d => {
+        const live = nodes.find(n => n.id === d.id) || d;
+        if (live.status === 'isolated') return '#ef4444';
+        if (live.status === 'degraded') return '#eab308';
+        if (live.status === 'syncing') return '#06b6d4';
+        if (d.role === 'firewall') return '#ef4444';
+        return '#00ff41';
+      });
+
+    // Update node text labels
+    svg.selectAll<SVGTextElement, NetworkNode>('.node-title-text')
+      .attr('fill', d => d.id === selectedNodeId ? '#00ff41' : '#e5e7eb')
+      .attr('opacity', d => {
+        if (filterRole === 'all') return 1;
+        return d.role === filterRole ? 1 : 0.35;
+      });
+
+    // Update links connected to isolated nodes
+    svg.selectAll<SVGLineElement, NetworkLink>('.link-line')
+      .transition()
+      .duration(200)
+      .attr('stroke-opacity', d => {
+        const srcId = typeof d.source === 'string' ? d.source : (d.source as NetworkNode).id;
+        const tgtId = typeof d.target === 'string' ? d.target : (d.target as NetworkNode).id;
+        const srcNode = nodes.find(n => n.id === srcId);
+        const tgtNode = nodes.find(n => n.id === tgtId);
+        if (srcNode?.status === 'isolated' || tgtNode?.status === 'isolated') {
+          return 0.15;
+        }
+        return 0.45;
+      })
+      .attr('stroke-dasharray', d => {
+        const srcId = typeof d.source === 'string' ? d.source : (d.source as NetworkNode).id;
+        const tgtId = typeof d.target === 'string' ? d.target : (d.target as NetworkNode).id;
+        const srcNode = nodes.find(n => n.id === srcId);
+        const tgtNode = nodes.find(n => n.id === tgtId);
+        if (srcNode?.status === 'isolated' || tgtNode?.status === 'isolated') {
+          return '2 4';
+        }
+        return d.quality < 90 ? '4 3' : 'none';
+      });
+  }, [selectedNodeId, nodes, filterRole]);
 
   // Handle Burst Packets
   const triggerPacketBurst = () => {
@@ -580,6 +710,17 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
       if (addLog) addLog('[D3] Re-heating force layout physics & relaxing constraints', 'info');
     }
   };
+
+  // Reset zoom & center camera on C2
+  const resetCamera = useCallback(() => {
+    if (!svgRef.current || !zoomBehaviorRef.current) return;
+    const svg = d3.select(svgRef.current);
+    svg.transition().duration(600).call(
+      zoomBehaviorRef.current.transform,
+      d3.zoomIdentity
+    );
+    if (addLog) addLog('[D3 CAMERA] Viewport reset to origin (1.0x scale)', 'info');
+  }, [addLog]);
 
   // Toggle play/pause simulation physics
   const toggleSimulation = () => {
@@ -620,12 +761,6 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
     }));
   };
 
-  // Filtered nodes
-  const displayNodes = useMemo(() => {
-    if (filterRole === 'all') return nodes;
-    return nodes.filter(n => n.role === filterRole);
-  }, [nodes, filterRole]);
-
   return (
     <div className="flex flex-col h-full space-y-4">
       {/* Top Tactical Bar */}
@@ -644,7 +779,7 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
         </div>
 
         {/* Graph Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Rate Selector */}
           <div className="flex items-center bg-ghost-dark border border-ghost-border text-[10px]">
             <button 
@@ -680,6 +815,14 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
           </button>
 
           <button
+            onClick={resetCamera}
+            className="p-1.5 bg-ghost-dark hover:bg-zinc-800 border border-ghost-border text-text-dim hover:text-white transition-colors"
+            title="Center C2 & Reset View"
+          >
+            <Crosshair className="w-3.5 h-3.5 text-ghost-green" />
+          </button>
+
+          <button
             onClick={toggleSimulation}
             className="p-1.5 bg-ghost-dark hover:bg-zinc-800 border border-ghost-border text-text-dim hover:text-white transition-colors"
             title={simulationRunning ? "Freeze physics" : "Resume physics"}
@@ -694,6 +837,32 @@ export default function NetworkTopologyGraph({ addLog, onSelectNode }: NetworkTo
           >
             <RotateCcw className="w-3.5 h-3.5" />
           </button>
+        </div>
+      </div>
+
+      {/* Role Filter Chips Bar */}
+      <div className="flex items-center justify-between border-b border-zinc-900 pb-2 text-[10px] font-mono">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-zinc-500 uppercase flex items-center gap-1 mr-1">
+            <Filter className="w-3 h-3" /> Filter:
+          </span>
+          {['all', 'c2', 'gateway', 'relay', 'sensor', 'beacon', 'firewall'].map(role => (
+            <button
+              key={role}
+              onClick={() => setFilterRole(role)}
+              className={`px-2.5 py-0.5 uppercase transition-all border ${
+                filterRole === role
+                  ? 'bg-ghost-green/20 border-ghost-green text-ghost-green font-bold'
+                  : 'bg-ghost-dark border-ghost-border text-zinc-500 hover:text-zinc-300'
+              }`}
+            >
+              {role}
+            </button>
+          ))}
+        </div>
+
+        <div className="text-[9px] text-zinc-600 hidden sm:block">
+          FORCE SIMULATION: {simulationRunning ? 'ACTIVE' : 'FROZEN'} &bull; D3 v7.9.0
         </div>
       </div>
 

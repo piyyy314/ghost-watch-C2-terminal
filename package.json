@@ -15,15 +15,15 @@
     "@tailwindcss/vite": "^4.3.5",
     "@vitejs/plugin-react": "^6.1.2",
     "d3": "^7.9.2",
-    "dotenv": "^18.0.9",
+    "dotenv": "^18.0.10",
     "express": "^4.22.3",
-    "lucide-react": "^1.65.0",
+    "lucide-react": "^1.73.0",
     "motion": "^14.8.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-markdown": "^10.1.0",
     "recharts": "^3.10.1",
-    "vite": "^8.3.5"
+    "vite": "^8.3.8"
   },
   "devDependencies": {
     "@types/d3": "^7.4.3",
@@ -31,9 +31,9 @@
     "@types/node": "^26.6.6",
     "autoprefixer": "^10.6.2",
     "esbuild": "^0.28.2",
-    "tailwindcss": "^4.3.3",
+    "tailwindcss": "^4.3.5",
     "tsx": "^4.23.15",
     "typescript": "~5.8.2",
-    "vite": "^8.3.5"
+    "vite": "^8.3.8"
   }
 }
